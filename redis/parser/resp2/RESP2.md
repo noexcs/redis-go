@@ -317,7 +317,6 @@ write operation by the client, without the need to read the server reply
 of the previous command before issuing the next one.
 All the replies can be read at the end.
 
-For more information please check our [page about Pipelining](/topics/pipelining).
 
 Inline Commands
 ---------------

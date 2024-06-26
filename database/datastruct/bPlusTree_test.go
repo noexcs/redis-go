@@ -6,12 +6,13 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strconv"
 	"testing"
 )
 
 func TestBPlusTree(t *testing.T) {
-	m := make(map[int]any)
-	bPlusTree := MakeNew()
+	m := make(map[string]any)
+	bPlusTree := MakeBPlusTree()
 	output, err := os.Create("test_operations.txt")
 	if err != nil {
 		fmt.Println(err)
@@ -23,7 +24,7 @@ func TestBPlusTree(t *testing.T) {
 		return
 	}
 	for i := 0; i < 10_0000; i++ {
-		key := rand.Intn(1000)
+		key := strconv.Itoa(rand.Intn(1000))
 		if _, ok := m[key]; ok {
 			// 验证在BPlusTree中也存在
 			if _, existInBPlusTree := bPlusTree.Get(key); !existInBPlusTree {
@@ -195,7 +196,7 @@ func Diagnose(t *BPlusTree, output io.Writer) bool {
 	return true
 }
 
-func getMaxMinKey(node *UnionNode) (max int, min int) {
+func getMaxMinKey(node *UnionNode) (max string, min string) {
 	if node.isLeaf {
 		if len(node.kvPairs) == 0 {
 			panic("Empty leafNode.")

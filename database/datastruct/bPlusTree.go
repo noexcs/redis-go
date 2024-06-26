@@ -354,7 +354,7 @@ func (t *BPlusTree) clearTree(node *UnionNode) {
 
 	// 清空子节点
 	if node.isLeaf {
-		for i, _ := range node.kvPairs {
+		for i := range node.kvPairs {
 			node.kvPairs[i] = nil
 		}
 	} else {
