@@ -88,4 +88,4 @@ sudo ./redis-server --port 6399
 
 # 演示
 
-<img src=".\img\demonstrate.png" style="zoom: 50%"/>
+<img src=".\img\demonstrate.png" style="zoom: 50%" alt="demonstrate"/>
