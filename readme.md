@@ -84,4 +84,8 @@ sudo ./redis-server --port 6399
   - [ ] ZREVRANK			
   - [ ] ZSCORE			
   - [ ] ZUNIONSTORE		
-  - [ ] ZSCAN				
+  - [ ] ZSCAN
+
+# 演示
+
+<img src=".\img\demonstrate.png" style="zoom: 50%"/>
