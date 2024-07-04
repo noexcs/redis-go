@@ -23,7 +23,7 @@ func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (
 		return &resp2.SimpleError{Kind: "ERR", Data: "command is empty"}
 	}
 
-	// 是否为不存的命令
+	// 是否为不存在的命令
 	cmdName := strings.ToUpper((*(*array).Data[0]).String())
 	cmd := command.CmdTable[cmdName]
 	if cmd == nil {

@@ -7,13 +7,13 @@ import (
 	"strings"
 )
 
-//  RESP data type	 Minimal protocol version	Category		First byte
+// RESP data type	 Minimal protocol version	Category		First byte
 
-//  Simple strings	 RESP2	    				Simple			+
-//  Simple Errors	 RESP2	    				Simple			-
-//  Integers	     RESP2	    				Simple	    	:
-//  Bulk strings	 RESP2	    				Aggregate		$
-//  Arrays	         RESP2	    				Aggregate		*
+// Simple strings	 RESP2	    				Simple			+
+// Simple Errors	 RESP2	    				Simple			-
+// Integers	     	 RESP2	    				Simple	    	:
+// Bulk strings	 	 RESP2	    				Aggregate		$
+// Arrays	         RESP2	    				Aggregate		*
 
 // resp2: https://redis.io/docs/reference/protocol-spec
 
@@ -40,14 +40,14 @@ func (r *SimpleString) String() string {
 	return r.Data
 }
 
-var oKSimpleString = SimpleString{Data: "OK"}
+var OKSimpleString = SimpleString{Data: "OK"}
 
 func MakeSimpleString(data string) *SimpleString {
 	return &SimpleString{Data: data}
 }
 
 func MakeOKSimpleString() *SimpleString {
-	return &oKSimpleString
+	return &OKSimpleString
 }
 
 func MakePONGSimpleString() *SimpleString {
@@ -59,7 +59,7 @@ func MakePONGSimpleString() *SimpleString {
 // SimpleError 以(-)开头，以(\r\n)结尾，中间为字符串
 // 例如：-ERR unknown command 'asdf'\r\n
 //
-//	-WRONGTYPE Operation against a key holding the wrong kind of value
+// -WRONGTYPE Operation against a key holding the wrong kind of value
 type SimpleError struct {
 	Kind string
 	Data string

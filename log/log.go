@@ -1,24 +1,21 @@
 package log
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 )
 
-// var debugMode = flag.Bool("debug", false, "是否开启调试模式")
-var debugMode = true
+var debugMode = flag.Bool("debug", false, "是否开启调试模式")
 
 func init() {
-
+	flag.Parse()
 }
 
 func WithLocation(message ...any) {
-
-	if !debugMode {
-		log.Println(message)
-	} else {
+	if *debugMode {
 		_, file, line, ok := runtime.Caller(1) // 获取调用者的信息
 		var Location string
 		if ok {

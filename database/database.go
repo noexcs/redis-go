@@ -5,7 +5,7 @@ type DB interface {
 
 	SetValue(key string, value any)
 
-	Delete(key string)
+	Delete(key string) bool
 
 	FlushDb()
 }

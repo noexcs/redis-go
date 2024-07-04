@@ -2,16 +2,16 @@ package resp3
 
 import "github.com/noexcs/redis-go/redis/parser/resp2"
 
-//  RESP data type	   Minimal protocol version	    Category		First byte
-//  Nulls		       RESP3	                    Simple	        _
-//  Booleans	       RESP3	                    Simple	        #
-//  Doubles	           RESP3	                    Simple	        ,
-//  Big numbers	       RESP3	                    Simple	        (
-//  Bulk errors	       RESP3	                    Aggregate	    !
-//  Verbatim strings   RESP3	                    Aggregate	    =
-//  Maps	           RESP3	                    Aggregate	    %
-//  Sets	           RESP3	                    Aggregate	    ~
-//  Pushes	           RESP3	                    Aggregate	    >
+// RESP data type	   Minimal protocol version	    Category		First byte
+// Nulls		       RESP3	                    Simple	        _
+// Booleans	           RESP3	                    Simple	        #
+// Doubles	           RESP3	                    Simple	        ,
+// Big numbers	       RESP3	                    Simple	        (
+// Bulk errors	       RESP3	                    Aggregate	    !
+// Verbatim strings    RESP3	                    Aggregate	    =
+// Maps	               RESP3	                    Aggregate	    %
+// Sets	               RESP3	                    Aggregate	    ~
+// Pushes	           RESP3	                    Aggregate	    >
 
 // Nulls
 // Null Bulk String, Null Arrays and Nulls

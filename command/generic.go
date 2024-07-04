@@ -11,6 +11,7 @@ func init() {
 	RegisterCommand("ping", execPing, nil, nil, -1, FlagReadonly)
 	RegisterCommand("auth", execAuth, nil, nil, -2, FlagReadonly)
 	RegisterCommand("flushdb", execFlushDb, nil, nil, 1, FlagWrite)
+	RegisterCommand("del", execDel, nil, nil, -2, FlagWrite)
 }
 
 func execFlushDb(db database.DB, args *resp2.Array) *parser.Response {
@@ -48,4 +49,17 @@ func execPing(db database.DB, args *resp2.Array) *parser.Response {
 	}
 
 	return &parser.Response{Args: resp2.MakePONGSimpleString()}
+}
+
+func execDel(db database.DB, args *resp2.Array) *parser.Response {
+	var count int64 = 0
+	for i := 1; i < len(args.Data); i++ {
+		if db.Delete((*args.Data[i]).String()) {
+			count++
+		}
+	}
+	return &parser.Response{
+		Args: &resp2.Integer{Data: count},
+		Err:  nil,
+	}
 }

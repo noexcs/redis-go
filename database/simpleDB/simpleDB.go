@@ -18,8 +18,8 @@ func (d *SingleDB) SetValue(key string, value any) {
 	d.data.Insert(key, value)
 }
 
-func (d *SingleDB) Delete(key string) {
-	d.data.Delete(key)
+func (d *SingleDB) Delete(key string) bool {
+	return d.data.Delete(key)
 }
 
 func (d *SingleDB) FlushDb() {

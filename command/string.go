@@ -11,6 +11,7 @@ func init() {
 	RegisterCommand("set", execSet, nil, nil, 3, FlagWrite)
 	RegisterCommand("get", execGet, nil, nil, 2, FlagReadonly)
 	RegisterCommand("getrange", execGetRange, nil, nil, 4, FlagReadonly)
+	RegisterCommand("incr", execIncr, nil, nil, 2, FlagWrite)
 }
 
 // Original: SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
@@ -22,16 +23,6 @@ func init() {
 //	Null reply: (nil) if the SET operation was not performed
 //		because the user specified the NX or XX option but the condition was not met.
 func execSet(db database.DB, args *resp2.Array) *parser.Response {
-	if args.Length != 3 {
-		return &parser.Response{
-			Args: nil,
-			Err: &parser.Error{
-				Kind:    "ERR",
-				Message: "WRONG number of arguments for 'SET' command",
-			},
-		}
-	}
-
 	data := args.Data
 	key := (*data[1]).String()
 	value := (*data[2]).String()
@@ -54,7 +45,13 @@ func execGet(db database.DB, args *resp2.Array) *parser.Response {
 		if v, ok := value.(string); ok {
 			return &parser.Response{Args: &resp2.BulkString{Data: []byte(v)}, Err: nil}
 		} else {
-			return &parser.Response{Args: &resp2.SimpleError{Kind: "WRONGTYPE", Data: "Operation against a key holding the wrong kind of value"}, Err: nil}
+			return &parser.Response{
+				Args: &resp2.SimpleError{
+					Kind: "WRONGTYPE",
+					Data: "Operation against a key holding the wrong kind of value",
+				},
+				Err: nil,
+			}
 		}
 	} else {
 		return &parser.Response{Args: resp2.MakeNullBulkString(), Err: nil}
@@ -96,4 +93,34 @@ func execGetRange(db database.DB, args *resp2.Array) *parser.Response {
 		}
 	}
 	return &parser.Response{Args: &resp2.BulkString{Data: []byte("")}}
+}
+
+// Increments the number stored at key by one. If the key does not exist, it is set to 0 before performing the operation.
+// An error is returned if the key contains a value of the wrong type or contains a string
+// that can not be represented as integer. This operation is limited to 64-bit signed integers.
+//
+// Note: this is a string operation because Redis does not have a dedicated integer type.
+// The string stored at the key is interpreted as a base-10 64-bit signed integer to execute the operation.
+//
+// Redis stores integers in their integer representation, so for string values that actually hold an integer,
+// there is no overhead for storing the string representation of the integer.
+func execIncr(db database.DB, args *resp2.Array) *parser.Response {
+	data := args.Data
+	key := (*data[1]).String()
+	value, exist := db.GetValue(key)
+	if !exist {
+		db.SetValue(key, "1")
+		return &parser.Response{Args: &resp2.Integer{Data: 1}}
+	} else {
+		i, err := strconv.ParseInt(value.(string), 0, 64)
+		if err != nil {
+			return &parser.Response{Args: &resp2.SimpleError{
+				Kind: "ERR",
+				Data: "Operation against a key holding the wrong kind of value",
+			}}
+		}
+		s := strconv.FormatInt(i+1, 10)
+		db.SetValue(key, s)
+		return &parser.Response{Args: &resp2.Integer{Data: i + 1}}
+	}
 }
