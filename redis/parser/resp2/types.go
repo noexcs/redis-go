@@ -40,20 +40,6 @@ func (r *SimpleString) String() string {
 	return r.Data
 }
 
-var OKSimpleString = SimpleString{Data: "OK"}
-
-func MakeSimpleString(data string) *SimpleString {
-	return &SimpleString{Data: data}
-}
-
-func MakeOKSimpleString() *SimpleString {
-	return &OKSimpleString
-}
-
-func MakePONGSimpleString() *SimpleString {
-	return &SimpleString{Data: "PONG"}
-}
-
 // ====================SimpleError======================
 
 // SimpleError 以(-)开头，以(\r\n)结尾，中间为字符串
@@ -71,10 +57,6 @@ func (r *SimpleError) ToBytes() []byte {
 
 func (r *SimpleError) String() string {
 	return fmt.Sprintf("%s %s", r.Kind, r.Data)
-}
-
-func MakeSimpleError(kind string, data string) *SimpleError {
-	return &SimpleError{Kind: kind, Data: data}
 }
 
 // =====================Integer=====================
@@ -116,10 +98,6 @@ func (r *BulkString) String() string {
 	return string(r.Data)
 }
 
-func MakeNullBulkString() *BulkString {
-	return &BulkString{Data: nil}
-}
-
 // =====================Array=====================
 
 // Array 表示一个数组，*<number-of-elements>\r\n<element-1>...<element-n>
@@ -152,4 +130,26 @@ func (r *Array) String() string {
 	}
 
 	return builder.String()
+}
+
+var OKSimpleString = SimpleString{Data: "OK"}
+
+func MakeSimpleString(data string) *SimpleString {
+	return &SimpleString{Data: data}
+}
+
+func MakeOKSimpleString() *SimpleString {
+	return &OKSimpleString
+}
+
+func MakePONGSimpleString() *SimpleString {
+	return &SimpleString{Data: "PONG"}
+}
+
+func MakeNullBulkString() *BulkString {
+	return &BulkString{Data: nil}
+}
+
+func MakeSimpleError(kind string, data string) *SimpleError {
+	return &SimpleError{Kind: kind, Data: data}
 }

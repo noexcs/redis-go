@@ -1,6 +1,8 @@
 package datastruct
 
 import (
+	"fmt"
+	"github.com/noexcs/redis-go/log"
 	"slices"
 	"sync"
 )
@@ -23,22 +25,26 @@ const MaxKeys = 3
 // MinKey + (MinKeys - 1) <= MaxKeys : 确保合并后的可能的最大孩子数量不超过 MaxKeys
 const MinKeys = 1
 
-type UnionNode struct {
-	parent   *UnionNode
-	leftPtr  *UnionNode
-	rightPtr *UnionNode
+type BPTKey interface {
+	int | string | VolatileKey | interface{}
+}
+
+type UnionNode[T BPTKey] struct {
+	parent   *UnionNode[T]
+	leftPtr  *UnionNode[T]
+	rightPtr *UnionNode[T]
 	isLeaf   bool
 
 	// internalNode field
-	keys     []string
-	children []*UnionNode
+	keys     []T
+	children []*UnionNode[T]
 
 	// leafNode field
-	kvPairs []*KVPair
+	kvPairs []*KVPair[T]
 }
 
-func newUnionNode(parent *UnionNode, leftPtr *UnionNode, rightPtr *UnionNode, isLeaf bool) *UnionNode {
-	node := &UnionNode{
+func newUnionNode[T BPTKey](parent *UnionNode[T], leftPtr *UnionNode[T], rightPtr *UnionNode[T], isLeaf bool) *UnionNode[T] {
+	node := &UnionNode[T]{
 		parent:   parent,
 		leftPtr:  leftPtr,
 		rightPtr: rightPtr,
@@ -46,41 +52,44 @@ func newUnionNode(parent *UnionNode, leftPtr *UnionNode, rightPtr *UnionNode, is
 	}
 	if isLeaf {
 		// 由于实现是每次添加后检查是否大于 MaxKeys 再进行分裂的，所以 kvPairs 最多能达到 MaxKeys + 1
-		node.kvPairs = make([]*KVPair, 0, MaxKeys+1)
+		node.kvPairs = make([]*KVPair[T], 0, MaxKeys+1)
 	} else {
 		// 由于实现是每次添加后检查是否大于 MaxChildren 再进行分裂的，所以 children 最多能达到 MaxChildren + 1
-		node.keys = make([]string, 0, MaxChildren)
-		node.children = make([]*UnionNode, 0, MaxChildren+1)
+		node.keys = make([]T, 0, MaxChildren)
+		node.children = make([]*UnionNode[T], 0, MaxChildren+1)
 	}
 	return node
 }
 
-func (node *UnionNode) insertKeyValue(t *BPlusTree, key string, value any) {
-	idx, found := slices.BinarySearchFunc(node.kvPairs, key, func(kvPair *KVPair, k string) int {
-		return CompareStrings(kvPair.key, k)
+func (node *UnionNode[T]) insertKeyValue(t *BPlusTree[T], key T, value any, replaceKey bool) {
+	idx, found := slices.BinarySearchFunc(node.kvPairs, key, func(kvPair *KVPair[T], k T) int {
+		return CompareBPTKeys[T](kvPair.key, k)
 	})
 	if found {
 		node.kvPairs[idx].value = value
+		if replaceKey {
+			node.kvPairs[idx].key = key
+		}
 	} else {
-		node.kvPairs = append(node.kvPairs[:idx], append([]*KVPair{{key, value}}, node.kvPairs[idx:]...)...)
+		node.kvPairs = append(node.kvPairs[:idx], append([]*KVPair[T]{{key, value}}, node.kvPairs[idx:]...)...)
 	}
 	if len(node.kvPairs) > MaxKeys {
 		node.split(t)
 	}
 }
 
-func (node *UnionNode) insertNode(t *BPlusTree, key string, childNode *UnionNode) {
-	insertKeyIdx, _ := slices.BinarySearchFunc(node.keys, key, func(keyInNode, k string) int {
-		return CompareStrings(keyInNode, k)
+func (node *UnionNode[T]) insertNode(t *BPlusTree[T], key T, childNode *UnionNode[T]) {
+	insertKeyIdx, _ := slices.BinarySearchFunc(node.keys, key, func(keyInNode, k T) int {
+		return CompareBPTKeys[T](keyInNode, k)
 	})
-	node.keys = append(node.keys[:insertKeyIdx], append([]string{key}, node.keys[insertKeyIdx:]...)...)
-	node.children = append(node.children[:insertKeyIdx+1], append([]*UnionNode{childNode}, node.children[insertKeyIdx+1:]...)...)
+	node.keys = append(node.keys[:insertKeyIdx], append([]T{key}, node.keys[insertKeyIdx:]...)...)
+	node.children = append(node.children[:insertKeyIdx+1], append([]*UnionNode[T]{childNode}, node.children[insertKeyIdx+1:]...)...)
 	if len(node.children) > MaxChildren {
 		node.split(t)
 	}
 }
 
-func (node *UnionNode) removeChild(t *BPlusTree, childNode *UnionNode) {
+func (node *UnionNode[T]) removeChild(t *BPlusTree[T], childNode *UnionNode[T]) {
 	for idx, childPtr := range node.children {
 		if childPtr == childNode {
 			if idx-1 == -1 {
@@ -103,9 +112,9 @@ func (node *UnionNode) removeChild(t *BPlusTree, childNode *UnionNode) {
 	}
 }
 
-func (node *UnionNode) removeKey(t *BPlusTree, key string) bool {
-	idx, found := slices.BinarySearchFunc(node.kvPairs, key, func(kvPair *KVPair, k string) int {
-		return CompareStrings(kvPair.key, k)
+func (node *UnionNode[T]) removeKey(t *BPlusTree[T], key T) bool {
+	idx, found := slices.BinarySearchFunc(node.kvPairs, key, func(kvPair *KVPair[T], k T) int {
+		return CompareBPTKeys[T](kvPair.key, k)
 	})
 	if found {
 		node.kvPairs = append(node.kvPairs[:idx], node.kvPairs[idx+1:]...)
@@ -118,9 +127,9 @@ func (node *UnionNode) removeKey(t *BPlusTree, key string) bool {
 	return found
 }
 
-func (node *UnionNode) split(t *BPlusTree) {
+func (node *UnionNode[T]) split(t *BPlusTree[T]) {
 	newNode := newUnionNode(node.parent, node, node.rightPtr, node.isLeaf)
-	var midKey string
+	var midKey T
 	if node.isLeaf {
 		midKeyIdx := len(node.kvPairs) / 2
 		midKey = node.kvPairs[midKeyIdx].key
@@ -153,7 +162,7 @@ func (node *UnionNode) split(t *BPlusTree) {
 	}
 	node.rightPtr = newNode
 	if node.parent == nil {
-		parent := newUnionNode(nil, nil, nil, false)
+		parent := newUnionNode[T](nil, nil, nil, false)
 		parent.keys = append(parent.keys, midKey)
 		parent.children = append(parent.children, node, newNode)
 
@@ -165,15 +174,15 @@ func (node *UnionNode) split(t *BPlusTree) {
 	}
 }
 
-func (node *UnionNode) borrow() bool {
+func (node *UnionNode[T]) borrow() bool {
 	parent := node.parent
 	leftNodePtr := node.leftPtr
 	rightNodePtr := node.rightPtr
 	idxInParent := getIdxInParent(node)
 	if node.isLeaf {
-		if borrowable(leftNodePtr, node) {
+		if borrowable[T](leftNodePtr, node) {
 			// 先从左边借
-			node.kvPairs = append([]*KVPair{leftNodePtr.kvPairs[len(leftNodePtr.kvPairs)-1]}, node.kvPairs...)
+			node.kvPairs = append([]*KVPair[T]{leftNodePtr.kvPairs[len(leftNodePtr.kvPairs)-1]}, node.kvPairs...)
 			leftNodePtr.kvPairs = leftNodePtr.kvPairs[:len(leftNodePtr.kvPairs)-1]
 			// 更新父节点指针对应的 key 的大小
 			parent.keys[idxInParent-1] = node.kvPairs[0].key
@@ -194,8 +203,8 @@ func (node *UnionNode) borrow() bool {
 			parent.keys[idxInParent-1] = leftNodePtr.keys[len(leftNodePtr.keys)-1]
 
 			// 更改该节点 key children 属性
-			node.keys = append([]string{midKey}, node.keys...)
-			node.children = append([]*UnionNode{leftNodePtr.children[len(leftNodePtr.children)-1]}, node.children...)
+			node.keys = append([]T{midKey}, node.keys...)
+			node.children = append([]*UnionNode[T]{leftNodePtr.children[len(leftNodePtr.children)-1]}, node.children...)
 
 			// 更改左节点 key children 属性
 			leftNodePtr.keys = leftNodePtr.keys[:len(leftNodePtr.keys)-1]
@@ -236,7 +245,7 @@ func (node *UnionNode) borrow() bool {
 	return false
 }
 
-func (node *UnionNode) merge(t *BPlusTree) {
+func (node *UnionNode[T]) merge(t *BPlusTree[T]) {
 	parent := node.parent
 	leftNodePtr := node.leftPtr
 	rightNodePtr := node.rightPtr
@@ -275,7 +284,7 @@ func (node *UnionNode) merge(t *BPlusTree) {
 	parent.removeChild(t, rightNodePtr)
 }
 
-func mergeable(node *UnionNode) bool {
+func mergeable[T BPTKey](node *UnionNode[T]) bool {
 	if node == nil {
 		return false
 	}
@@ -286,7 +295,7 @@ func mergeable(node *UnionNode) bool {
 	}
 }
 
-func borrowable(node *UnionNode, borrower *UnionNode) bool {
+func borrowable[T BPTKey](node *UnionNode[T], borrower *UnionNode[T]) bool {
 	if node == nil || borrower == nil {
 		return false
 	}
@@ -297,7 +306,7 @@ func borrowable(node *UnionNode, borrower *UnionNode) bool {
 	}
 }
 
-func getIdxInParent(node *UnionNode) int {
+func getIdxInParent[T BPTKey](node *UnionNode[T]) int {
 	if node.parent == nil {
 		return -1
 	}
@@ -309,36 +318,36 @@ func getIdxInParent(node *UnionNode) int {
 	return -1
 }
 
-type KVPair struct {
-	key   string
+type KVPair[T BPTKey] struct {
+	key   T
 	value any
 }
 
-type BPlusTree struct {
-	root          *UnionNode
-	firstLeafNode *UnionNode
+type BPlusTree[T BPTKey] struct {
+	root          *UnionNode[T]
+	firstLeafNode *UnionNode[T]
 	mutex         sync.RWMutex
 }
 
-func MakeBPlusTree() *BPlusTree {
-	return &BPlusTree{}
+func MakeBPlusTree[T BPTKey]() *BPlusTree[T] {
+	return &BPlusTree[T]{}
 }
 
-func (t *BPlusTree) Insert(key string, value any) {
+func (t *BPlusTree[T]) Insert(key T, value any, replaceKey bool) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.findLeafNode(key).insertKeyValue(t, key, value)
+	t.findLeafNode(key).insertKeyValue(t, key, value, replaceKey)
 }
 
-func (t *BPlusTree) Delete(key string) bool {
+func (t *BPlusTree[T]) Delete(key T) bool {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
 	return t.findLeafNode(key).removeKey(t, key)
 }
 
-func (t *BPlusTree) Clear() {
+func (t *BPlusTree[T]) Clear() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -347,7 +356,7 @@ func (t *BPlusTree) Clear() {
 	t.firstLeafNode = nil
 }
 
-func (t *BPlusTree) clearTree(node *UnionNode) {
+func (t *BPlusTree[T]) clearTree(node *UnionNode[T]) {
 	if node == nil {
 		return
 	}
@@ -373,24 +382,24 @@ func (t *BPlusTree) clearTree(node *UnionNode) {
 	node.kvPairs = nil
 }
 
-func (t *BPlusTree) Get(key string) (any, bool) {
+func (t *BPlusTree[T]) Get(key T) (k T, v any, e bool) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	leafNode := t.findLeafNode(key)
-	idx, found := slices.BinarySearchFunc(leafNode.kvPairs, key, func(kvPair *KVPair, k string) int {
-		return CompareStrings(kvPair.key, k)
+	idx, found := slices.BinarySearchFunc(leafNode.kvPairs, key, func(kvPair *KVPair[T], k T) int {
+		return CompareBPTKeys[T](kvPair.key, k)
 	})
 	if found {
-		return leafNode.kvPairs[idx].value, true
+		return leafNode.kvPairs[idx].key, leafNode.kvPairs[idx].value, true
 	}
-	return nil, false
+	return k, nil, false
 }
 
 // 返回key所在的leafNode, 或者应该插入的leafNode
-func (t *BPlusTree) findLeafNode(key string) (target *UnionNode) {
+func (t *BPlusTree[T]) findLeafNode(key T) (target *UnionNode[T]) {
 	if t.root == nil {
-		t.firstLeafNode = newUnionNode(nil, nil, nil, true)
+		t.firstLeafNode = newUnionNode[T](nil, nil, nil, true)
 		t.root = t.firstLeafNode
 		return t.root
 	}
@@ -399,7 +408,9 @@ func (t *BPlusTree) findLeafNode(key string) (target *UnionNode) {
 	}
 	cursor := t.root
 	for {
-		idx, found := slices.BinarySearch(cursor.keys, key)
+		idx, found := slices.BinarySearchFunc(cursor.keys, key, func(k1 T, k2 T) int {
+			return CompareBPTKeys[T](k1, k2)
+		})
 		if found {
 			cursor = cursor.children[idx+1]
 		} else {
@@ -411,27 +422,27 @@ func (t *BPlusTree) findLeafNode(key string) (target *UnionNode) {
 	}
 }
 
-func (t *BPlusTree) Iterator() *Iterator {
+func (t *BPlusTree[T]) Iterator() *Iterator[T] {
 	t.mutex.RLock()
-	return &Iterator{
+	return &Iterator[T]{
 		node: t.firstLeafNode,
 		idx:  0,
 		tree: t,
 	}
 }
 
-type Iterator struct {
-	node      *UnionNode
+type Iterator[T BPTKey] struct {
+	node      *UnionNode[T]
 	idx       int
-	tree      *BPlusTree
+	tree      *BPlusTree[T]
 	rUnLocked bool
 }
 
-func (iter *Iterator) Next() bool {
+func (iter *Iterator[T]) Next() bool {
 	return iter.node != nil && iter.idx < len(iter.node.kvPairs)
 }
 
-func (iter *Iterator) Value() (k string, v any) {
+func (iter *Iterator[T]) Value() (k T, v any) {
 	if iter.rUnLocked {
 		if iter.Next() {
 			panic("The Iterator is unavailable. Discarded ahead of time.")
@@ -458,7 +469,7 @@ func (iter *Iterator) Value() (k string, v any) {
 }
 
 // Discard 不再使用该迭代器，提前解锁读锁
-func (iter *Iterator) Discard() {
+func (iter *Iterator[T]) Discard() {
 	// 判断一下保证幂等性
 	if !iter.rUnLocked {
 		iter.node = nil
@@ -480,4 +491,28 @@ func CompareStrings(str1, str2 string) int {
 	} else {
 		return 1
 	}
+}
+
+func CompareBPTKeys[T BPTKey](key1 T, key2 T) int {
+	var k1 string
+	var k2 string
+	switch v := any(key1).(type) {
+	case string:
+		k1 = v
+	case *VolatileKey:
+		k1 = v.Name
+	default:
+		log.WithLocation(fmt.Sprintf("Unsupported key type of %T", key1))
+		return 0
+	}
+	switch v := any(key2).(type) {
+	case string:
+		k2 = v
+	case *VolatileKey:
+		k2 = v.Name
+	default:
+		log.WithLocation(fmt.Sprintf("Unsupported key type of %T", key1))
+		return 0
+	}
+	return CompareStrings(k1, k2)
 }

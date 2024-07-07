@@ -1,36 +1,156 @@
 package command
 
 import (
+	"fmt"
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/redis/parser"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"strconv"
+	"strings"
+	"time"
 )
 
 func init() {
-	RegisterCommand("set", execSet, nil, nil, 3, FlagWrite)
+	RegisterCommand("set", execSet, nil, nil, -3, FlagWrite)
 	RegisterCommand("get", execGet, nil, nil, 2, FlagReadonly)
 	RegisterCommand("getrange", execGetRange, nil, nil, 4, FlagReadonly)
 	RegisterCommand("incr", execIncr, nil, nil, 2, FlagWrite)
 }
 
-// Original: SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-// Implementation: SET key value
+// Reference: https://redis.io/docs/latest/commands/set/
 //
-// Return
+// Syntax:
 //
-//	Simple string reply: OK if SET was executed correctly.
-//	Null reply: (nil) if the SET operation was not performed
-//		because the user specified the NX or XX option but the condition was not met.
+// SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
 func execSet(db database.DB, args *resp2.Array) *parser.Response {
 	data := args.Data
 	key := (*data[1]).String()
 	value := (*data[2]).String()
 	db.SetValue(key, value)
 
-	return &parser.Response{
-		Args: &resp2.SimpleString{Data: "OK"},
-		Err:  nil,
+	options := make(map[string]interface{})
+	for i := 3; i < len(data); i++ {
+		Option := strings.ToUpper((*data[i]).String())
+		switch Option {
+		case "NX", "XX":
+			{
+				if _, ok := options["NXXX"]; ok && options["NXXX"] != Option {
+					return &parser.Response{
+						Args: &resp2.SimpleError{
+							Kind: "ERR",
+							Data: "Different NX and XX are set repeatedly.",
+						},
+						Err: nil,
+					}
+				}
+				options["NXXX"] = Option
+			}
+		case "GET":
+			options["GET"] = struct{}{}
+		case "EX", "PX", "EXAT", "PXAT", "KEEPTTL":
+			{
+				// If two different TTLs are set repeatedly.
+				if _, ok := options["TTL"]; ok && options["TTL"] != Option {
+					return &parser.Response{
+						Args: resp2.MakeNullBulkString(),
+						Err:  nil,
+					}
+				}
+				if Option == "KEEPTTL" {
+					options["TTL"] = Option
+				} else if i+1 >= len(data) {
+					return &parser.Response{
+						Args: &resp2.SimpleError{
+							Kind: "ERR",
+							Data: fmt.Sprintf("Insufficient parameter for option %s.", Option),
+						},
+						Err: nil,
+					}
+				} else {
+					duration := *data[i+1]
+					atoi, err := strconv.ParseInt(duration.String(), 10, 64)
+					if err != nil {
+						return &parser.Response{
+							Args: &resp2.SimpleError{
+								Kind: "ERR",
+								Data: fmt.Sprintf("Invalid parameter for option %s.", Option),
+							},
+							Err: nil,
+						}
+					}
+					options["TTL"] = []interface{}{Option, atoi}
+					i++
+				}
+			}
+		}
+	}
+
+	existedValue, exist := db.GetValue(key)
+	if _, ok := options["NXXX"]; ok {
+		if (options["NXXX"] == "NX" && !exist) || (options["NXXX"] == "XX" && exist) {
+			if ttlOption, ok := options["TTL"]; ok {
+				if ttl, ok := ttlOption.([]interface{}); ok {
+					d := ttl[1].(int64)
+					if ttl[0] == "EX" {
+						db.SetValueWithExpiration(key, value, time.Now().Add(time.Duration(d)*time.Second))
+					} else if ttl[0] == "PX" {
+						db.SetValueWithExpiration(key, value, time.Now().Add(time.Duration(d)*time.Millisecond))
+					} else if ttl[0] == "EXAT" {
+						db.SetValueWithExpiration(key, value, time.Unix(d, 0))
+					} else if ttl[0] == "PXAT" {
+						db.SetValueWithExpiration(key, value, time.Unix(d, 0))
+					} else if ttl[0] == "KEEPTTL" {
+						db.SetValueWithKeepTTL(key, value)
+					}
+				}
+			} else {
+				db.SetValue(key, value)
+			}
+		} else {
+			simpleError := &resp2.SimpleError{
+				Kind: "ERR",
+				Data: "The key does not exist.",
+			}
+			if exist {
+				simpleError.Data = "The key has already exist."
+			}
+			return &parser.Response{
+				Args: simpleError,
+				Err:  nil,
+			}
+		}
+	} else {
+		if ttlOption, ok := options["TTL"]; ok {
+			if ttl, ok := ttlOption.([]interface{}); ok {
+				d := ttl[1].(int64)
+				if ttl[0] == "EX" {
+					db.SetValueWithExpiration(key, value, time.Now().Add(time.Duration(d)*time.Second))
+				} else if ttl[0] == "PX" {
+					db.SetValueWithExpiration(key, value, time.Now().Add(time.Duration(d)*time.Millisecond))
+				} else if ttl[0] == "EXAT" {
+					db.SetValueWithExpiration(key, value, time.Unix(d, 0))
+				} else if ttl[0] == "PXAT" {
+					db.SetValueWithExpiration(key, value, time.Unix(d, 0))
+				} else if ttl[0] == "KEEPTTL" {
+					db.SetValueWithKeepTTL(key, value)
+				}
+			}
+		} else {
+			db.SetValue(key, value)
+		}
+	}
+	if _, ok := options["GET"]; ok {
+		if exist {
+			return &parser.Response{Args: &resp2.BulkString{Data: []byte(existedValue.(string))}, Err: nil}
+		} else {
+			return &parser.Response{Args: resp2.MakeNullBulkString(), Err: nil}
+		}
+	} else {
+		if exist {
+			return &parser.Response{Args: &resp2.SimpleString{Data: "OK"}, Err: nil}
+		} else {
+			return &parser.Response{Args: resp2.MakeNullBulkString(), Err: nil}
+		}
 	}
 }
 
@@ -95,7 +215,8 @@ func execGetRange(db database.DB, args *resp2.Array) *parser.Response {
 	return &parser.Response{Args: &resp2.BulkString{Data: []byte("")}}
 }
 
-// Increments the number stored at key by one. If the key does not exist, it is set to 0 before performing the operation.
+// Increments the number stored at key by one.
+// If the key does not exist, it is set to 0 before performing the operation.
 // An error is returned if the key contains a value of the wrong type or contains a string
 // that can not be represented as integer. This operation is limited to 64-bit signed integers.
 //
