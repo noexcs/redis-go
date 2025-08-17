@@ -8,10 +8,22 @@ import (
 )
 
 func init() {
+	RegisterCommand("hello", execHello, nil, nil, -2, FlagWrite)
 	RegisterCommand("ping", execPing, nil, nil, -1, FlagReadonly)
 	RegisterCommand("auth", execAuth, nil, nil, -2, FlagReadonly)
 	RegisterCommand("flushdb", execFlushDb, nil, nil, 1, FlagWrite)
 	RegisterCommand("del", execDel, nil, nil, -2, FlagWrite)
+}
+
+func execHello(db database.DB, args *resp2.Array) *parser.Response {
+	version := (*args.Data[1]).String()
+	if version != "2" {
+		return &parser.Response{
+			Args: resp2.MakeSimpleError("NOPROTO", "sorry this protocol version is not supported"),
+			Err:  nil,
+		}
+	}
+	return nil
 }
 
 func execFlushDb(db database.DB, args *resp2.Array) *parser.Response {
@@ -34,8 +46,6 @@ func execAuth(db database.DB, args *resp2.Array) *parser.Response {
 	} else {
 		return &parser.Response{Args: resp2.MakeSimpleError("ERR", "Client sent AUTH, but no password is set")}
 	}
-
-	return nil
 }
 
 // PING [message]

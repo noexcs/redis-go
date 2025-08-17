@@ -27,6 +27,17 @@ func WithLocation(message ...any) {
 	}
 }
 
+func ForceWithLocation(message ...any) {
+	_, file, line, ok := runtime.Caller(1)
+	var Location string
+	if ok {
+		Location = fmt.Sprintf("%s:%d -", file, line)
+	} else {
+		Location = "???:0 -"
+	}
+	log.Println(Location, message)
+}
+
 func FatalWithLocation(message ...any) {
 	WithLocation(message)
 	os.Exit(1)

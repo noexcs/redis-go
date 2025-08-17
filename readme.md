@@ -30,7 +30,7 @@ sudo ./redis-server --port 6399
     PING <message>
     ```
  - [x] DEL
-    
+   
  - HASH
    - [x] HSET
    - [x] HGET
@@ -64,6 +64,10 @@ sudo ./redis-server --port 6399
   - [ ] SSCAN
 - STRING
   - [x] SET
+  
+    ```sh
+    SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
+    ```
   - [x] GET
   - [x] GETRANGE
   - [x] INCR

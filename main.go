@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	// find config file "redis.conf"
+	// find a config file "redis.conf"
 	config.Setup()
 	tcp.ListenAndServeWithSignal(config.Properties, handler.New())
 }

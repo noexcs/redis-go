@@ -28,11 +28,11 @@ func ListenAndServeWithSignal(config *config.ServerProperties, handler *handler.
 
 	listener, err := net.Listen("tcp", config.Bind+":"+strconv.FormatInt(int64(config.Port), 10))
 	if err != nil {
-		log.WithLocation(err)
+		log.ForceWithLocation(err)
 		return
 	}
 
-	log.WithLocation("Listening on " + config.Bind + ":" + strconv.FormatInt(int64(config.Port), 10) + "")
+	log.ForceWithLocation("Listening on " + config.Bind + ":" + strconv.FormatInt(int64(config.Port), 10) + "")
 
 	ListenAndServe(listener, handler, closeChan)
 }
@@ -42,7 +42,7 @@ func ListenAndServe(listener net.Listener, handler *handler.RequestHandler, clos
 	go func() {
 		// Receives System Signal from sigCh
 		<-closeChan
-		log.WithLocation("\033[04mShutting down...")
+		log.ForceWithLocation("\033[04mShutting down...")
 
 		// Stop to accept new connection.
 		listener.Close()
@@ -50,9 +50,9 @@ func ListenAndServe(listener net.Listener, handler *handler.RequestHandler, clos
 		handler.Close()
 	}()
 
-	log.WithLocation("The server has been started.")
+	log.ForceWithLocation("The server has been started.")
 
-	for true {
+	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			break
