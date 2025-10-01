@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+type dbRequest struct {
+	Client *client.Client
+	Args   resp2.RespType
+	Result chan resp2.RespType
+}
+
 type Server struct {
 	db       *simpleDB.SingleDB
 	listener net.Listener
@@ -24,11 +30,15 @@ type Server struct {
 
 	activeConn sync.Map
 	Proceeding sync.WaitGroup
+
+	// 数据库请求通道
+	dbChan chan *dbRequest
 }
 
 func NewServer() *Server {
 	return &Server{
-		db: simpleDB.NewSingleDB(),
+		db:     simpleDB.NewSingleDB(),
+		dbChan: make(chan *dbRequest, 1000), // 缓冲1000个请求
 	}
 }
 
@@ -46,6 +56,9 @@ func (s *Server) Start() error {
 	s.mutex.Unlock()
 
 	log.Info(fmt.Sprintf("Server started on %s", address))
+
+	// 启动数据库处理 goroutine
+	go s.processDBRequests()
 
 	// 启动定期清理过期键的任务
 	go s.startPeriodicCleanup()
@@ -73,7 +86,6 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Handle(conn net.Conn) {
-
 	// 解析客户端请求
 	requestChan := parser.ParseIncomeStream(conn)
 
@@ -86,14 +98,26 @@ func (s *Server) Handle(conn net.Conn) {
 
 	// 处理请求
 	for request := range requestChan {
-		//parseResult(request)
+		log.Debug("Client command: ", request.Args.String())
 		var response resp2.RespType
 		if request.Err != nil {
 			break
-		} else {
-			response = handler.HandleCommand(clientInst, request.Args, s.db)
 		}
+		// 验证命令
+		response = handler.ValidateCommand(clientInst, request.Args)
+		if response == nil {
+			// 将请求发送到数据库处理 goroutine
+			resultChan := make(chan resp2.RespType, 1)
+			s.dbChan <- &dbRequest{
+				Client: clientInst,
+				Args:   request.Args,
+				Result: resultChan,
+			}
 
+			// 等待结果
+			response = <-resultChan
+			close(resultChan)
+		}
 		if response == nil {
 			response = &resp2.SimpleString{Data: "OK"}
 		}
@@ -103,9 +127,17 @@ func (s *Server) Handle(conn net.Conn) {
 			log.Debug("Write response error: " + err.Error())
 			break
 		}
-		s.db.RandomExpiredKeys()
 	}
 	log.Debug("Client " + conn.RemoteAddr().String() + " disconnected.")
+}
+
+// processDBRequests 在单独的 goroutine 中处理所有数据库请求
+func (s *Server) processDBRequests() {
+	for req := range s.dbChan {
+		response := handler.ExecCommand(req.Client, req.Args, s.db)
+		req.Result <- response
+		s.db.RandomExpiredKeys()
+	}
 }
 
 func (s *Server) CloseClient(c *client.Client) {
@@ -159,6 +191,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	select {
 	case <-done:
 		log.Info("Server shutdown complete")
+		// 关闭数据库请求通道
+		close(s.dbChan)
 	case <-ctx.Done():
 		log.Info("Server shutdown timeout")
 		return ctx.Err()

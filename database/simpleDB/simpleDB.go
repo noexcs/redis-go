@@ -3,19 +3,15 @@ package simpleDB
 import (
 	"github.com/noexcs/redis-go/database/datastruct"
 	"math/rand"
-	"sync"
 	"time"
 )
 
 type SingleDB struct {
 	index int
 	data  *datastruct.BPlusTree[interface{}]
-	mutex sync.RWMutex
 }
 
 func (d *SingleDB) GetValue(key string) (any, bool) {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
 
 	k, v, exist := d.data.Get(key)
 	if !exist {
@@ -23,11 +19,7 @@ func (d *SingleDB) GetValue(key string) (any, bool) {
 	}
 	if volatileKey, ok := k.(*datastruct.VolatileKey); ok {
 		if volatileKey.ExpiredAt.Before(time.Now()) {
-			d.mutex.RUnlock()
-			d.mutex.Lock()
 			d.data.Delete(key)
-			d.mutex.Unlock()
-			d.mutex.RLock()
 			return nil, false
 		}
 		return v, true
@@ -36,9 +28,6 @@ func (d *SingleDB) GetValue(key string) (any, bool) {
 }
 
 func (d *SingleDB) SetValueWithExpiration(key string, value any, expiration time.Time) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	d.data.Insert(&datastruct.VolatileKey{
 		Name:      key,
 		ExpiredAt: expiration,
@@ -46,38 +35,24 @@ func (d *SingleDB) SetValueWithExpiration(key string, value any, expiration time
 }
 
 func (d *SingleDB) SetValueWithKeepTTL(key string, value any) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	d.data.Insert(key, value, false)
 }
 
 func (d *SingleDB) SetValue(key string, value any) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
 
 	d.data.Insert(key, value, true)
 }
 
 func (d *SingleDB) Delete(key string) bool {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	return d.data.Delete(key)
 }
 
 func (d *SingleDB) FlushDb() {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	d.data.Clear()
 }
 
 // RandomExpiredKeys 定期删除策略：随机检查并删除过期键
 func (d *SingleDB) RandomExpiredKeys() {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	// 获取所有键的迭代器
 	iterator := d.data.Iterator()
 	count := 0
@@ -99,9 +74,6 @@ func (d *SingleDB) RandomExpiredKeys() {
 
 // DeleteExpiredKeys 定时删除策略：主动删除所有过期键
 func (d *SingleDB) DeleteExpiredKeys() {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	// 获取所有键的迭代器
 	iterator := d.data.Iterator()
 

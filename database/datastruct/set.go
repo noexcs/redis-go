@@ -2,12 +2,10 @@ package datastruct
 
 import (
 	"github.com/emirpasic/gods/sets/hashset"
-	"sync"
 )
 
 type Set struct {
-	dict  *hashset.Set
-	mutex sync.RWMutex
+	dict *hashset.Set
 }
 
 func NewSet() *Set {
@@ -15,8 +13,6 @@ func NewSet() *Set {
 }
 
 func (s *Set) Add(value string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	s.dict.Add(value)
 }
 
@@ -36,19 +32,13 @@ func (s *Set) Members() []string {
 }
 
 func (s *Set) Remove(v string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	s.dict.Remove(v)
 }
 
 func (s *Set) Contains(v string) bool {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	return s.dict.Contains(v)
 }
 
 func (s *Set) Size() int {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	return s.dict.Size()
 }

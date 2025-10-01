@@ -44,7 +44,7 @@ func (h *RequestHandler) Handle(conn net.Conn) {
 		if request.Err != nil {
 			break
 		} else {
-			response = HandleCommand(clientInst, request.Args, h.db)
+			response = ExecCommand(clientInst, request.Args, h.db)
 		}
 
 		if response == nil {
