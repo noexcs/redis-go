@@ -56,7 +56,7 @@ func (h *RequestHandler) Handle(conn net.Conn) {
 			break
 		}
 	}
-	log.WithLocation("Client " + conn.RemoteAddr().String() + " disconnected.")
+	log.Debug("Client " + conn.RemoteAddr().String() + " disconnected.")
 }
 
 func parseResult(request *parser.Request) {
@@ -64,7 +64,7 @@ func parseResult(request *parser.Request) {
 	// 打印request类型
 	if request != nil {
 		outType := reflect.TypeOf(request.Args)
-		log.WithLocation(fmt.Sprintf("request type: %s", outType.Name()))
+		log.Debug(fmt.Sprintf("request type: %s", outType.Name()))
 
 		array, ok := request.Args.(*resp2.Array)
 		if ok {
@@ -73,12 +73,12 @@ func parseResult(request *parser.Request) {
 				//[*resp2.RespType, *resp2.RespType, *resp2.RespType, *resp2.RespType, ]
 				builder.WriteString(fmt.Sprintf("%s, ", reflect.TypeOf((*array).Data[i]).Name()))
 			}
-			log.WithLocation(builder.String())
+			log.Debug(builder.String())
 		}
 
 		if request.Args != nil {
 			m := fmt.Sprintf("%q", request.Args.String())
-			log.WithLocation("Receive request: ", m)
+			log.Debug("Receive request: ", m)
 		}
 	}
 }

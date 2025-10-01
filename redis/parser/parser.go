@@ -20,7 +20,7 @@ func ParseIncomeStream(conn net.Conn) <-chan *Request {
 		defer close(requestChan)
 		err := parseBackground(conn, requestChan)
 		if err != nil {
-			log.WithLocation(err)
+			log.Debug("Client message parse error: ", err)
 		}
 	}()
 	return requestChan

@@ -25,7 +25,7 @@ var _ = Describe("config", func() {
 			Expect(Properties.Debug).To(Equal(true))
 		})
 		It("Requirepass", func() {
-			Expect(Properties.Requirepass).To(Equal("123456"))
+			Expect(Properties.RequirePass).To(Equal("123456"))
 		})
 	})
 })

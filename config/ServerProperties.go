@@ -59,7 +59,7 @@ func parseConfigFile(filePath string) *ServerProperties {
 
 	// there is an error spawned during reading the "redis.conf"
 	if err := scanner.Err(); err != nil {
-		log.FatalWithLocation(err)
+		log.Fatal(err)
 	}
 
 	tPtr := reflect.TypeOf(config)
@@ -96,7 +96,7 @@ func parseConfigFile(filePath string) *ServerProperties {
 func fileExist(file string) bool {
 	fileInfo, err := os.Stat(file)
 	if err != nil {
-		log.WithLocation("Config file %s does not exist.", file)
+		log.Info("Config file %s does not exist.", file)
 	}
 
 	return err == nil && !fileInfo.IsDir()

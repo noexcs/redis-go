@@ -15,7 +15,7 @@ import (
 // A Redis server replies to clients, sending any valid RESP data type as a reply.
 // https://redis.io/docs/reference/protocol-spec/#sending-commands-to-a-redis-server
 func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (result resp2.RespType) {
-	log.WithLocation("Client command: ", args.String())
+	log.Debug("Client command: ", args.String())
 
 	// 是否为空命令
 	array := args.(*resp2.Array)

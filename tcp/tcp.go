@@ -61,10 +61,10 @@ func (s *Server) Start() error {
 
 		conn, err := listener.Accept()
 		if err != nil {
-			log.WithLocation("Accept error: " + err.Error())
+			log.Debug("Accept error: " + err.Error())
 			continue
 		}
-		log.Info("New connection from " + conn.RemoteAddr().String())
+		log.Debug("New connection from " + conn.RemoteAddr().String())
 		s.wg.Add(1)
 		go s.Handle(conn)
 	}
@@ -100,12 +100,12 @@ func (s *Server) Handle(conn net.Conn) {
 
 		err := clientInst.Write(response.ToBytes())
 		if err != nil {
-			log.WithLocation("Write response error: " + err.Error())
+			log.Debug("Write response error: " + err.Error())
 			break
 		}
 		s.db.RandomExpiredKeys()
 	}
-	log.WithLocation("Client " + conn.RemoteAddr().String() + " disconnected.")
+	log.Debug("Client " + conn.RemoteAddr().String() + " disconnected.")
 }
 
 func (s *Server) CloseClient(c *client.Client) {

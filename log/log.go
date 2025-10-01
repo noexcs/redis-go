@@ -1,48 +1,17 @@
+//go:build !debug
+
 package log
 
-import (
-	"flag"
-	"fmt"
-	"log"
-	"os"
-	"runtime"
-)
+import "log"
 
-var debugMode = flag.Bool("debug", true, "是否开启调试模式")
-
-func init() {
-	flag.Parse()
+func Debug(message ...any) {
+	// 在非调试模式下，不输出调试信息
 }
 
-func WithLocation(message ...any) {
-	if *debugMode {
-		_, file, line, ok := runtime.Caller(1) // 获取调用者的信息
-		var Location string
-		if ok {
-			Location = fmt.Sprintf("%s:%d -", file, line)
-		} else {
-			Location = "???:0 -"
-		}
-		log.Println(Location, message)
-	}
+func Fatal(message ...any) {
+
 }
 
-func ForceWithLocation(message ...any) {
-	_, file, line, ok := runtime.Caller(1)
-	var Location string
-	if ok {
-		Location = fmt.Sprintf("%s:%d -", file, line)
-	} else {
-		Location = "???:0 -"
-	}
-	log.Println(Location, message)
-}
-
-func FatalWithLocation(message ...any) {
-	WithLocation(message)
-	os.Exit(1)
-}
-
-func Info(s string) {
-	WithLocation(s)
+func Info(message ...any) {
+	log.Println(message)
 }

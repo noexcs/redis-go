@@ -33,6 +33,6 @@ func main() {
 	// Start the server
 	err := server.Start()
 	if err != nil {
-		log.WithLocation("Failed to start server: " + err.Error())
+		log.Info("Failed to start server: " + err.Error())
 	}
 }

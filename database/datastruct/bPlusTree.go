@@ -503,7 +503,7 @@ func CompareBPTKeys[T BPTKey](key1 T, key2 T) int {
 	case *VolatileKey:
 		k1 = v.Name
 	default:
-		log.WithLocation(fmt.Sprintf("Unsupported key type of %T", key1))
+		log.Debug(fmt.Sprintf("Unsupported key type of %T", key1))
 		return 0
 	}
 	switch v := any(key2).(type) {
@@ -512,7 +512,7 @@ func CompareBPTKeys[T BPTKey](key1 T, key2 T) int {
 	case *VolatileKey:
 		k2 = v.Name
 	default:
-		log.WithLocation(fmt.Sprintf("Unsupported key type of %T", key1))
+		log.Debug(fmt.Sprintf("Unsupported key type of %T", key1))
 		return 0
 	}
 	return CompareStrings(k1, k2)
