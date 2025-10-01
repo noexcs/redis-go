@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-var debugMode = flag.Bool("debug", false, "是否开启调试模式")
+var debugMode = flag.Bool("debug", true, "是否开启调试模式")
 
 func init() {
 	flag.Parse()
@@ -41,4 +41,8 @@ func ForceWithLocation(message ...any) {
 func FatalWithLocation(message ...any) {
 	WithLocation(message)
 	os.Exit(1)
+}
+
+func Info(s string) {
+	WithLocation(s)
 }

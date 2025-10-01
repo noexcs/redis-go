@@ -13,7 +13,7 @@ type ServerProperties struct {
 	Bind string
 	Port int
 
-	Requirepass string
+	RequirePass string
 
 	Debug bool
 }

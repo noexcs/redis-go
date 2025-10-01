@@ -36,7 +36,7 @@ func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (
 	}
 
 	// 是否需要密码并已验证
-	if config.Properties.Requirepass != "" && !client.Authenticated {
+	if config.Properties.RequirePass != "" && !client.Authenticated {
 		if cmdName != "AUTH" {
 			return &resp2.SimpleError{Kind: "Err", Data: "NOAUTH"}
 		}

@@ -1,74 +1,168 @@
 package tcp
 
 import (
+	"context"
+	"fmt"
 	"github.com/noexcs/redis-go/config"
+	"github.com/noexcs/redis-go/database/simpleDB"
 	"github.com/noexcs/redis-go/log"
+	"github.com/noexcs/redis-go/redis/client"
 	"github.com/noexcs/redis-go/redis/handler"
+	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"net"
-	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
+	"sync"
+	"time"
 )
 
-var closeChan = make(chan struct{})
+type Server struct {
+	db       *simpleDB.SingleDB
+	listener net.Listener
+	running  bool
+	mutex    sync.Mutex
+	wg       sync.WaitGroup
 
-func ListenAndServeWithSignal(config *config.ServerProperties, handler *handler.RequestHandler) {
-
-	// 接收系统信号用于停止程序
-	sigCh := make(chan os.Signal)
-	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		sig := <-sigCh
-		switch sig {
-		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			closeChan <- struct{}{}
-		}
-	}()
-
-	listener, err := net.Listen("tcp", config.Bind+":"+strconv.FormatInt(int64(config.Port), 10))
-	if err != nil {
-		log.ForceWithLocation(err)
-		return
-	}
-
-	log.ForceWithLocation("Listening on " + config.Bind + ":" + strconv.FormatInt(int64(config.Port), 10) + "")
-
-	ListenAndServe(listener, handler, closeChan)
+	activeConn sync.Map
+	Proceeding sync.WaitGroup
 }
 
-func ListenAndServe(listener net.Listener, handler *handler.RequestHandler, closeChan chan struct{}) {
+func NewServer() *Server {
+	return &Server{
+		db: simpleDB.NewSingleDB(),
+	}
+}
 
-	go func() {
-		// Receives System Signal from sigCh
-		<-closeChan
-		log.ForceWithLocation("\033[04mShutting down...")
+func (s *Server) Start() error {
+	address := fmt.Sprintf("%s:%d", config.Properties.Bind, config.Properties.Port)
 
-		// Stop to accept new connection.
-		listener.Close()
-		// Close established connections.
-		handler.Close()
-	}()
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return err
+	}
 
-	log.ForceWithLocation("The server has been started.")
+	s.mutex.Lock()
+	s.listener = listener
+	s.running = true
+	s.mutex.Unlock()
+
+	log.Info(fmt.Sprintf("Server started on %s", address))
+
+	// 启动定期清理过期键的任务
+	go s.startPeriodicCleanup()
 
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
+		s.mutex.Lock()
+		running := s.running
+		s.mutex.Unlock()
+
+		if !running {
 			break
 		}
-		log.WithLocation("Accepted connection from " + conn.RemoteAddr().String() + ".")
-		go func(conn2 net.Conn) {
-			handler.Proceeding.Add(1)
-			defer handler.Proceeding.Done()
 
-			handler.Handle(conn2)
-		}(conn)
+		conn, err := listener.Accept()
+		if err != nil {
+			log.WithLocation("Accept error: " + err.Error())
+			continue
+		}
+		log.Info("New connection from " + conn.RemoteAddr().String())
+		s.wg.Add(1)
+		go s.Handle(conn)
 	}
 
-	handler.Proceeding.Wait()
+	return nil
 }
 
-func StopService() {
-	closeChan <- struct{}{}
+func (s *Server) Handle(conn net.Conn) {
+
+	// 解析客户端请求
+	requestChan := parser.ParseIncomeStream(conn)
+
+	// 创建客户端实例，存入map中
+	clientInst := client.New(conn)
+
+	s.activeConn.Store(clientInst, struct{}{})
+	// channel被关闭(或连接断开)，删除客户端
+	defer s.CloseClient(clientInst)
+
+	// 处理请求
+	for request := range requestChan {
+		//parseResult(request)
+		var response resp2.RespType
+		if request.Err != nil {
+			break
+		} else {
+			response = handler.HandleCommand(clientInst, request.Args, s.db)
+		}
+
+		if response == nil {
+			response = &resp2.SimpleString{Data: "OK"}
+		}
+
+		err := clientInst.Write(response.ToBytes())
+		if err != nil {
+			log.WithLocation("Write response error: " + err.Error())
+			break
+		}
+		s.db.RandomExpiredKeys()
+	}
+	log.WithLocation("Client " + conn.RemoteAddr().String() + " disconnected.")
+}
+
+func (s *Server) CloseClient(c *client.Client) {
+	s.activeConn.Delete(c)
+	c.Close()
+}
+
+// startPeriodicCleanup 启动定期清理任务
+func (s *Server) startPeriodicCleanup() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		s.mutex.Lock()
+		running := s.running
+		s.mutex.Unlock()
+
+		if !running {
+			break
+		}
+
+		select {
+		case <-ticker.C:
+			// 定期执行全面的过期键清理
+			s.db.DeleteExpiredKeys()
+		case <-time.After(10 * time.Second):
+		}
+	}
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.mutex.Lock()
+	if !s.running {
+		s.mutex.Unlock()
+		return nil
+	}
+
+	s.running = false
+	if s.listener != nil {
+		_ = s.listener.Close()
+	}
+	s.mutex.Unlock()
+
+	// 等待所有连接处理完成
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Info("Server shutdown complete")
+	case <-ctx.Done():
+		log.Info("Server shutdown timeout")
+		return ctx.Err()
+	}
+
+	return nil
 }

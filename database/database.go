@@ -14,4 +14,10 @@ type DB interface {
 	Delete(key string) bool
 
 	FlushDb()
+
+	// DeleteExpiredKeys 定时删除过期键
+	DeleteExpiredKeys()
+
+	// RandomExpiredKeys 随机删除过期键（定期删除的一部分）
+	RandomExpiredKeys()
 }

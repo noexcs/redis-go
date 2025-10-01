@@ -27,12 +27,12 @@ func ParseIncomeStream(conn net.Conn) <-chan *Request {
 }
 
 // 解析 Redis 数据
-// 参考：https://redis.io/docs/reference/protocol-spec/
+// 参考：https://redis.io/docs/latest/develop/reference/protocol-spec
 func parseBackground(conn net.Conn, requestChan chan *Request) error {
 	reader := bufio.NewReader(conn)
 	for {
-		// ReadBytes reads until the first occurrence of delim in the input,
-		// returning a slice containing the data up to and including the delimiter.
+		// 从连接中读取数据，直到遇到定界符（'\n'）
+		// 返回一个slice，包含数据以及定界符（'\n'）
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			// If ReadBytes encounters an error before finding a delimiter,

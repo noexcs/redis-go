@@ -31,45 +31,39 @@ func execFlushDb(db database.DB, args *resp2.Array) *parser.Response {
 	return &parser.Response{Args: resp2.MakeOKSimpleString()}
 }
 
-// Original: AUTH [username] password
-// Implementation: AUTH password
-// https://redis.io/commands/auth/
-func execAuth(db database.DB, args *resp2.Array) *parser.Response {
-	//config.Properties.
-	password := (*args.Data[1]).String()
-	if config.Properties.Requirepass != "" {
-		if config.Properties.Requirepass != password {
-			return &parser.Response{Args: resp2.MakeSimpleError("ERR ", "invalid password")}
-		} else {
-			return &parser.Response{Args: resp2.MakeOKSimpleString()}
-		}
-	} else {
-		return &parser.Response{Args: resp2.MakeSimpleError("ERR", "Client sent AUTH, but no password is set")}
-	}
-}
-
-// PING [message]
-// PING https://redis.io/commands/ping/
-func execPing(db database.DB, args *resp2.Array) *parser.Response {
-
-	if args.Length >= 2 {
-		data := (*args.Data[1]).(*resp2.BulkString).Data
-		r := resp2.BulkString{Data: data}
-		return &parser.Response{Args: &r}
-	}
-
-	return &parser.Response{Args: resp2.MakePONGSimpleString()}
-}
-
 func execDel(db database.DB, args *resp2.Array) *parser.Response {
-	var count int64 = 0
-	for i := 1; i < len(args.Data); i++ {
-		if db.Delete((*args.Data[i]).String()) {
+	count := 0
+	for i := 1; i < args.Length; i++ {
+		key := (*args.Data[i]).String()
+		if db.Delete(key) {
 			count++
 		}
 	}
-	return &parser.Response{
-		Args: &resp2.Integer{Data: count},
-		Err:  nil,
+
+	// 主动触发一次过期键清理
+	if simpleDB, ok := db.(interface{ DeleteExpiredKeys() }); ok {
+		simpleDB.DeleteExpiredKeys()
 	}
+
+	return &parser.Response{Args: &resp2.Integer{Data: int64(count)}}
+}
+
+func execPing(db database.DB, args *resp2.Array) *parser.Response {
+	if args.Length == 1 {
+		return &parser.Response{Args: resp2.MakeSimpleString("PONG")}
+	} else {
+		message := (*args.Data[1]).String()
+		return &parser.Response{Args: resp2.MakeSimpleString(message)}
+	}
+}
+
+func execAuth(db database.DB, args *resp2.Array) *parser.Response {
+	if len(config.Properties.RequirePass) == 0 {
+		return &parser.Response{Args: resp2.MakeSimpleError("ERR", "Client sent AUTH, but no password is set")}
+	}
+	pass := (*args.Data[1]).String()
+	if pass != config.Properties.RequirePass {
+		return &parser.Response{Args: resp2.MakeSimpleError("ERR", "invalid password")}
+	}
+	return &parser.Response{Args: resp2.MakeOKSimpleString()}
 }

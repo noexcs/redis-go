@@ -128,6 +128,7 @@ func (node *UnionNode[T]) removeKey(t *BPlusTree[T], key T) bool {
 }
 
 func (node *UnionNode[T]) split(t *BPlusTree[T]) {
+	// 新节点在父节点的右边
 	newNode := newUnionNode(node.parent, node, node.rightPtr, node.isLeaf)
 	var midKey T
 	if node.isLeaf {
