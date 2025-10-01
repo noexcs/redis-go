@@ -23,7 +23,9 @@ type SkipList struct {
 	level int
 }
 
-func newSkipList() *SkipList {
+const maxLevel = 48
+
+func NewSkipList() *SkipList {
 	/*
 			         +----+           +----+
 			         |    +---------->|    |
@@ -36,7 +38,7 @@ func newSkipList() *SkipList {
 		value: nil,
 	}
 	tail := &SkipListEntry{
-		key:   "",
+		key:   "\uffff",
 		value: nil,
 	}
 	head.right = tail
@@ -50,17 +52,6 @@ func newSkipList() *SkipList {
 func (skiplist *SkipList) findEntry(key string) (p *SkipListEntry) {
 	p = skiplist.head
 	for {
-		/*
-			   Search RIGHT until you find a LARGER entry
-
-			   E.g.: k = 34
-
-			                     10 ---> 20 ---> 30 ---> 40
-			                                      ^
-			                                      |
-			                                      p stops here
-					p.right.key = 40 > k
-		*/
 		for p.right != skiplist.tail && p.right.key <= key {
 			p = p.right
 		}
@@ -71,6 +62,9 @@ func (skiplist *SkipList) findEntry(key string) (p *SkipListEntry) {
 		} else {
 			break
 		}
+	}
+	if p == skiplist.tail {
+		panic("tail.key should be empty")
 	}
 	return p
 }
@@ -109,7 +103,7 @@ func (skiplist *SkipList) Put(key string, value any) (oldValue any) {
 
 	// toss a coin to decide whether to move up
 	currentLevel := 0
-	for rand.Intn(2) == 0 {
+	for rand.Intn(2) == 0 && currentLevel < maxLevel {
 		currentLevel++
 		if currentLevel > skiplist.level {
 			// Create new level
@@ -118,7 +112,7 @@ func (skiplist *SkipList) Put(key string, value any) (oldValue any) {
 				value: nil,
 			}
 			newLevelTail := &SkipListEntry{
-				key:   "",
+				key:   "\uffff",
 				value: nil,
 			}
 			// Connect each other
@@ -173,12 +167,26 @@ func (skiplist *SkipList) Remove(key string) (value any) {
 	for p != nil {
 		p.left.right = p.right
 		p.right.left = p.left
+		// 清理指针
+		p.left = nil
+		p.right = nil
+		p.up = nil
+		p.down = nil
 		p = p.up
 	}
 	skiplist.size--
+
+	// 检查是否需要减少层数
+	for skiplist.level > 0 && skiplist.head.right == skiplist.tail {
+		// 最高层只剩 head 和 tail，移除该层
+		skiplist.head = skiplist.head.down
+		skiplist.tail = skiplist.tail.down
+		skiplist.head.up = nil
+		skiplist.tail.up = nil
+		skiplist.level--
+	}
 	return value
 }
-
 func (skiplist *SkipList) Get(key string) (v any) {
 	p := skiplist.findEntry(key)
 	if p.key == key {

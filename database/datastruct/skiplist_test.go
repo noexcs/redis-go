@@ -12,7 +12,7 @@ func init() {
 }
 
 func TestSkipList_New(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	if sl == nil {
 		t.Error("Expected newSkipList() to return a non-nil SkipList")
@@ -40,7 +40,7 @@ func TestSkipList_New(t *testing.T) {
 }
 
 func TestSkipList_PutAndGet(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	// 测试插入新键值对
 	oldValue := sl.Put("key1", "value1")
@@ -77,7 +77,7 @@ func TestSkipList_PutAndGet(t *testing.T) {
 }
 
 func TestSkipList_Remove(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	// 插入一些数据
 	sl.Put("key1", "value1")
@@ -116,7 +116,7 @@ func TestSkipList_Remove(t *testing.T) {
 }
 
 func TestSkipList_MultipleOperations(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	// 插入大量数据
 	testData := map[string]interface{}{
@@ -164,7 +164,7 @@ func TestSkipList_MultipleOperations(t *testing.T) {
 }
 
 func TestSkipList_LevelManagement(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	// 初始级别应该是0
 	if sl.level != 0 {
@@ -194,7 +194,7 @@ func TestSkipList_LevelManagement(t *testing.T) {
 }
 
 func TestSkipList_EmptyOperations(t *testing.T) {
-	sl := newSkipList()
+	sl := NewSkipList()
 
 	// 在空SkipList上进行各种操作
 	value := sl.Get("anykey")
