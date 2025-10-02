@@ -2,7 +2,7 @@ package command
 
 import (
 	"github.com/noexcs/redis-go/database"
-	"github.com/noexcs/redis-go/database/datastruct"
+	"github.com/noexcs/redis-go/database/datastruct/sets"
 	"github.com/noexcs/redis-go/redis/parser"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 )
@@ -136,15 +136,15 @@ func execSadd(db database.DB, args *resp2.Array) *parser.Response {
 }
 
 // if the value is not the type set, return WRONGTYPE Error
-func getOrInitSet(db database.DB, key string) (*datastruct.Set, *parser.Response) {
+func getOrInitSet(db database.DB, key string) (sets.Set, *parser.Response) {
 	value, exist := db.GetValue(key)
 	if !exist {
-		set := datastruct.NewSet()
+		set := sets.NewHashSet()
 		db.SetValue(key, set)
 		return set, nil
 	}
 
-	set, ok := value.(*datastruct.Set)
+	set, ok := value.(sets.Set)
 	if !ok {
 		return nil, &parser.Response{Args: nil, Err: &parser.Error{
 			Kind:    "WRONGTYPE",

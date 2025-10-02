@@ -1,22 +1,23 @@
-package datastruct
+package sets
 
 import (
 	"github.com/emirpasic/gods/sets/hashset"
 )
 
-type Set struct {
+// HashSet 使用hashset实现的Set
+type HashSet struct {
 	dict *hashset.Set
 }
 
-func NewSet() *Set {
-	return &Set{dict: hashset.New()}
+func NewHashSet() *HashSet {
+	return &HashSet{dict: hashset.New()}
 }
 
-func (s *Set) Add(value string) {
+func (s *HashSet) Add(value string) {
 	s.dict.Add(value)
 }
 
-func (s *Set) Members() []string {
+func (s *HashSet) Members() []string {
 
 	values := s.dict.Values()
 
@@ -31,14 +32,14 @@ func (s *Set) Members() []string {
 	return result
 }
 
-func (s *Set) Remove(v string) {
+func (s *HashSet) Remove(v string) {
 	s.dict.Remove(v)
 }
 
-func (s *Set) Contains(v string) bool {
+func (s *HashSet) Contains(v string) bool {
 	return s.dict.Contains(v)
 }
 
-func (s *Set) Size() int {
+func (s *HashSet) Size() int {
 	return s.dict.Size()
 }
