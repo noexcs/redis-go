@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/noexcs/redis-go/config"
+	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/database/simpleDB"
 	"github.com/noexcs/redis-go/log"
 	"github.com/noexcs/redis-go/redis/client"
@@ -22,7 +23,7 @@ type dbRequest struct {
 }
 
 type Server struct {
-	db       *simpleDB.SingleDB
+	db       database.DB
 	listener net.Listener
 	running  bool
 	mutex    sync.Mutex
@@ -37,7 +38,7 @@ type Server struct {
 
 func NewServer() *Server {
 	return &Server{
-		db:     simpleDB.NewSingleDB(),
+		db:     simpleDB.NewGoMapDB(),
 		dbChan: make(chan *dbRequest, 1000), // 缓冲1000个请求
 	}
 }
