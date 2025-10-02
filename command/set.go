@@ -4,6 +4,7 @@ import (
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/database/datastruct"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 )
 
@@ -39,14 +40,14 @@ func init() {
 // 返回值 整数:
 // 1 如果成员元素是集合的成员，返回 1 。
 // 0 如果成员元素不是集合的成员，或 key 不存在，返回 0 。
-func execSismember(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execSismember(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	set, errResponse := getOrInitSet(db, key)
 	if errResponse != nil {
 		return errResponse
 	}
 	code := 0
-	if set.Contains((*args.Data[2]).String()) {
+	if set.Contains(args[2].String()) {
 		code = 1
 	}
 	return &parser.Response{Args: &resp2.Integer{Data: int64(code)}}
@@ -55,8 +56,8 @@ func execSismember(db database.DB, args *resp2.Array) *parser.Response {
 // SMEMBERS key
 // Return
 // Array reply: all elements of the set.
-func execSmember(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execSmember(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	set, errResponse := getOrInitSet(db, key)
 	if errResponse != nil {
 		return errResponse
@@ -65,13 +66,13 @@ func execSmember(db database.DB, args *resp2.Array) *parser.Response {
 	memberCnt := len(members)
 
 	result := resp2.Array{
-		Data:   make([]*resp2.RespType, memberCnt),
+		Data:   make([]resp.RespValue, memberCnt),
 		Length: memberCnt,
 	}
 
 	for i := 0; i < memberCnt; i++ {
-		var r resp2.RespType = &resp2.BulkString{Data: []byte(members[i])}
-		result.Data[i] = &r
+		var r resp.RespValue = &resp2.BulkString{Data: []byte(members[i])}
+		result.Data[i] = r
 	}
 
 	return &parser.Response{Args: &result}
@@ -81,8 +82,8 @@ func execSmember(db database.DB, args *resp2.Array) *parser.Response {
 // SCARD KEY_NAME
 // 返回值 整数: 集合中成员的数量。
 // 当集合 key 不存在时，返回 0 。
-func execScard(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execScard(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	set, errResponse := getOrInitSet(db, key)
 	if errResponse != nil {
 		return errResponse
@@ -96,16 +97,16 @@ func execScard(db database.DB, args *resp2.Array) *parser.Response {
 // Integer reply: the number of members that were removed from the set,
 //
 //	not including non existing members.
-func execSrem(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execSrem(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	set, ErrResponse := getOrInitSet(db, key)
 	if ErrResponse != nil {
 		return ErrResponse
 	}
 
 	count := 0
-	for i := 2; i < args.Length; i++ {
-		v := (*args.Data[i]).String()
+	for i := 2; i < len(args); i++ {
+		v := args[i].String()
 		if set.Contains(v) {
 			set.Remove(v)
 			count++
@@ -120,15 +121,15 @@ func execSrem(db database.DB, args *resp2.Array) *parser.Response {
 // Integer reply: the number of elements that were added to the set,
 //
 //	not including all the elements already present in the set.
-func execSadd(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execSadd(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	set, errResponse := getOrInitSet(db, key)
 	if errResponse != nil {
 		return errResponse
 	}
 	var count int64
-	for i := 2; i < args.Length; i++ {
-		set.Add((*args.Data[i]).String())
+	for i := 2; i < len(args); i++ {
+		set.Add(args[i].String())
 		count++
 	}
 
@@ -146,7 +147,7 @@ func getOrInitSet(db database.DB, key string) (*datastruct.Set, *parser.Response
 
 	set, ok := value.(*datastruct.Set)
 	if !ok {
-		return nil, &parser.Response{Args: nil, Err: &parser.Error{
+		return nil, &parser.Response{Args: nil, Err: &resp.Error{
 			Kind:    "WRONGTYPE",
 			Message: "Operation against a key holding the wrong kind of value",
 		}}

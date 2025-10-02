@@ -4,6 +4,7 @@ import (
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/database/datastruct"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"strconv"
 )
@@ -18,7 +19,7 @@ func init() {
 	RegisterCommand("rpop", execRpop, nil, nil, -2, FlagWrite)
 }
 
-func execRpop(db database.DB, args *resp2.Array) *parser.Response {
+func execRpop(db database.DB, args []resp.RespValue) *parser.Response {
 	return pop(db, args, true)
 }
 
@@ -42,12 +43,12 @@ func execRpop(db database.DB, args *resp2.Array) *parser.Response {
 // When called with the count argument:
 //
 // Array reply: list of popped elements, or nil when key does not exist.
-func execLpop(db database.DB, args *resp2.Array) *parser.Response {
+func execLpop(db database.DB, args []resp.RespValue) *parser.Response {
 	return pop(db, args, false)
 }
 
-func pop(db database.DB, args *resp2.Array, right bool) *parser.Response {
-	key := (*args.Data[1]).String()
+func pop(db database.DB, args []resp.RespValue, right bool) *parser.Response {
+	key := args[1].String()
 	list, errResponse, keyExist := getOrInitList(db, key, false)
 	if !keyExist {
 		return &parser.Response{Args: resp2.MakeNullBulkString()}
@@ -55,8 +56,8 @@ func pop(db database.DB, args *resp2.Array, right bool) *parser.Response {
 	if errResponse != nil {
 		return errResponse
 	}
-	if args.Length >= 3 {
-		count, err := strconv.Atoi((*args.Data[2]).String())
+	if len(args) >= 3 {
+		count, err := strconv.Atoi(args[2].String())
 		if err != nil {
 			return &parser.Response{Args: resp2.MakeSimpleError("ERR", "Wrong count arg.")}
 		}
@@ -65,7 +66,7 @@ func pop(db database.DB, args *resp2.Array, right bool) *parser.Response {
 		}
 
 		arr := resp2.Array{
-			Data:   make([]*resp2.RespType, count),
+			Data:   make([]resp.RespValue, count),
 			Length: count,
 		}
 		for i := 0; i < count; i++ {
@@ -77,8 +78,8 @@ func pop(db database.DB, args *resp2.Array, right bool) *parser.Response {
 				v, exist = list.PopLeft()
 			}
 			if exist {
-				var r resp2.RespType = &resp2.BulkString{Data: []byte(v)}
-				arr.Data[i] = &r
+				var r resp.RespValue = &resp2.BulkString{Data: []byte(v)}
+				arr.Data[i] = r
 			}
 		}
 		return &parser.Response{Args: &arr}
@@ -100,15 +101,15 @@ func pop(db database.DB, args *resp2.Array, right bool) *parser.Response {
 // LPUSH key element [element ...]
 // Return
 // Integer reply: the length of the list after the push operations.
-func execLpush(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execLpush(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	list, errResponse, _ := getOrInitList(db, key, true)
 	if errResponse != nil {
 		return errResponse
 	}
 
-	for i := 2; i < args.Length; i++ {
-		element := (*args.Data[i]).String()
+	for i := 2; i < len(args); i++ {
+		element := args[i].String()
 		list.PushLeft(element)
 	}
 	return &parser.Response{Args: &resp2.Integer{Data: list.Size()}}
@@ -117,15 +118,15 @@ func execLpush(db database.DB, args *resp2.Array) *parser.Response {
 // RPUSH key element [element ...]
 // Return
 // Integer reply: the length of the list after the push operation.
-func execRpush(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execRpush(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	list, errResponse, _ := getOrInitList(db, key, true)
 	if errResponse != nil {
 		return errResponse
 	}
 
-	for i := 2; i < args.Length; i++ {
-		element := (*args.Data[i]).String()
+	for i := 2; i < len(args); i++ {
+		element := args[i].String()
 		list.PushRight(element)
 	}
 	return &parser.Response{Args: &resp2.Integer{Data: list.Size()}}
@@ -145,7 +146,7 @@ func getOrInitList(db database.DB, key string, init bool) (*datastruct.List, *pa
 
 	list, ok := value.(*datastruct.List)
 	if !ok {
-		return nil, &parser.Response{Args: nil, Err: &parser.Error{
+		return nil, &parser.Response{Args: nil, Err: &resp.Error{
 			Kind:    "WRONGTYPE",
 			Message: "Operation against a key holding the wrong kind of value",
 		}}, true

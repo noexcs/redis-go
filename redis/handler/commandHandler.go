@@ -6,6 +6,7 @@ import (
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/log"
 	"github.com/noexcs/redis-go/redis/client"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"strings"
 )
@@ -14,7 +15,7 @@ import (
 // A client sends the Redis server an array consisting of only bulk strings.
 // A Redis server replies to clients, sending any valid RESP data type as a reply.
 // https://redis.io/docs/reference/protocol-spec/#sending-commands-to-a-redis-server
-func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (result resp2.RespType) {
+func HandleCommand(client *client.Client, args resp.RespValue, db database.DB) (result resp.RespValue) {
 	log.Debug("Client command: ", args.String())
 
 	// 是否为空命令
@@ -24,7 +25,7 @@ func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (
 	}
 
 	// 是否为不存在的命令
-	cmdName := strings.ToUpper((*(*array).Data[0]).String())
+	cmdName := strings.ToUpper(array.Data[0].String())
 	cmd := command.CmdTable[cmdName]
 	if cmd == nil {
 		return &resp2.SimpleError{Kind: "ERR", Data: "command " + cmdName + " not found"}
@@ -42,7 +43,7 @@ func HandleCommand(client *client.Client, args resp2.RespType, db database.DB) (
 		}
 	}
 
-	response := cmd.Executor(db, array)
+	response := cmd.Executor(db, array.Data)
 
 	if response != nil {
 		if response.Err != nil {

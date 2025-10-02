@@ -3,7 +3,7 @@ package command
 import (
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/redis/parser"
-	"github.com/noexcs/redis-go/redis/parser/resp2"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"strings"
 )
 
@@ -32,9 +32,9 @@ const (
 	FlagReadonly
 )
 
-type ExecFunc func(db database.DB, args *resp2.Array) *parser.Response
-type PreFunc func(db database.DB, args *resp2.Array) *parser.Response
-type UndoFunc func(db database.DB, args *resp2.Array) *parser.Response
+type ExecFunc func(db database.DB, args []resp.RespValue) *parser.Response
+type PreFunc func(db database.DB, args []resp.RespValue) *parser.Response
+type UndoFunc func(db database.DB, args []resp.RespValue) *parser.Response
 
 func RegisterCommand(name string, execFunc ExecFunc, preFunc PreFunc, undoFunc UndoFunc, arity int, flags Flag) {
 	cmd := &command{

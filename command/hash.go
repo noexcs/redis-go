@@ -4,6 +4,7 @@ import (
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/database/datastruct"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 )
 
@@ -28,8 +29,8 @@ func init() {
 // HGET key field
 // 返回值
 // 多行字符串: 返回给定字段的值。如果给定的字段或 key 不存在时，返回 nil 。
-func execHget(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execHget(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	hashmap, errResponse, exist := getOrInitHashmap(db, key, false)
 	if !exist {
 		return &parser.Response{Args: resp2.MakeNullBulkString()}
@@ -37,7 +38,7 @@ func execHget(db database.DB, args *resp2.Array) *parser.Response {
 	if errResponse != nil {
 		return errResponse
 	}
-	field := (*args.Data[2]).String()
+	field := args[2].String()
 	v, found := hashmap.Get(field)
 	if !found {
 		return &parser.Response{Args: resp2.MakeNullBulkString()}
@@ -51,17 +52,17 @@ func execHget(db database.DB, args *resp2.Array) *parser.Response {
 // HSET key field value [field value ...]
 // 返回值 整数:
 // 只有被修改返回0 ，有增加返回增加的 field 个数。
-func execHset(db database.DB, args *resp2.Array) *parser.Response {
-	key := (*args.Data[1]).String()
+func execHset(db database.DB, args []resp.RespValue) *parser.Response {
+	key := args[1].String()
 	hashmap, errResponse, _ := getOrInitHashmap(db, key, true)
 	if errResponse != nil {
 		return errResponse
 	}
 
 	var count int64 = 0
-	for i := 2; i+1 < args.Length; i += 2 {
-		field := (*args.Data[i]).String()
-		value := (*args.Data[i+1]).String()
+	for i := 2; i+1 < len(args); i += 2 {
+		field := args[i].String()
+		value := args[i+1].String()
 		if !hashmap.Contains(field) {
 			count++
 		}
@@ -86,7 +87,7 @@ func getOrInitHashmap(db database.DB, key string, init bool) (*datastruct.Hashma
 
 	hashmap, ok := value.(*datastruct.Hashmap)
 	if !ok {
-		return nil, &parser.Response{Args: nil, Err: &parser.Error{
+		return nil, &parser.Response{Args: nil, Err: &resp.Error{
 			Kind:    "WRONGTYPE",
 			Message: "Operation against a key holding the wrong kind of value",
 		}}, true

@@ -9,6 +9,7 @@ import (
 	"github.com/noexcs/redis-go/redis/client"
 	"github.com/noexcs/redis-go/redis/handler"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"net"
 	"sync"
@@ -87,7 +88,7 @@ func (s *Server) Handle(conn net.Conn) {
 	// 处理请求
 	for request := range requestChan {
 		//parseResult(request)
-		var response resp2.RespType
+		var response resp.RespValue
 		if request.Err != nil {
 			break
 		} else {
