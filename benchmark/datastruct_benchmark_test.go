@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"github.com/noexcs/redis-go/database/datastruct/maps"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -59,7 +60,7 @@ func BenchmarkGoMapGet(b *testing.B) {
 }
 
 func BenchmarkHashmapPut(b *testing.B) {
-	h := datastruct.NewHashmap()
+	h := maps.NewHashmap()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -69,7 +70,7 @@ func BenchmarkHashmapPut(b *testing.B) {
 }
 
 func BenchmarkHashmapGet(b *testing.B) {
-	h := datastruct.NewHashmap()
+	h := maps.NewHashmap()
 	// Pre-populate the hashmap
 	for i := 0; i < 10000; i++ {
 		key := "key" + strconv.Itoa(i)

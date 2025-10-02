@@ -2,7 +2,7 @@ package command
 
 import (
 	"github.com/noexcs/redis-go/database"
-	"github.com/noexcs/redis-go/database/datastruct"
+	"github.com/noexcs/redis-go/database/datastruct/maps"
 	"github.com/noexcs/redis-go/redis/parser"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 )
@@ -72,11 +72,11 @@ func execHset(db database.DB, args *resp2.Array) *parser.Response {
 }
 
 // if the value is not the type set, return WRONGTYPE Error
-func getOrInitHashmap(db database.DB, key string, init bool) (*datastruct.Hashmap, *parser.Response, bool) {
+func getOrInitHashmap(db database.DB, key string, init bool) (maps.Map, *parser.Response, bool) {
 	value, exist := db.GetValue(key)
 	if !exist {
 		if init {
-			newHashmap := datastruct.NewHashmap()
+			newHashmap := maps.NewGoMap()
 			db.SetValue(key, newHashmap)
 			return newHashmap, nil, false
 		} else {
@@ -84,7 +84,7 @@ func getOrInitHashmap(db database.DB, key string, init bool) (*datastruct.Hashma
 		}
 	}
 
-	hashmap, ok := value.(*datastruct.Hashmap)
+	hashmap, ok := value.(maps.Map)
 	if !ok {
 		return nil, &parser.Response{Args: nil, Err: &parser.Error{
 			Kind:    "WRONGTYPE",

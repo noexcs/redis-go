@@ -1,4 +1,4 @@
-package datastruct
+package maps
 
 import (
 	"github.com/emirpasic/gods/maps/hashmap"
@@ -24,7 +24,7 @@ func (h *Hashmap) Get(key string) (string, bool) {
 	return "", found
 }
 
-func (h *Hashmap) Contains(field string) bool {
-	_, found := h.dict.Get(field)
+func (h *Hashmap) Contains(key string) bool {
+	_, found := h.dict.Get(key)
 	return found
 }
