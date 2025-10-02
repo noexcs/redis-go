@@ -98,11 +98,11 @@ func (s *Server) Handle(conn net.Conn) {
 
 	// 处理请求
 	for request := range requestChan {
-		log.Debug("Client command: ", request.Args.String())
 		var response resp2.RespType
 		if request.Err != nil {
 			break
 		}
+		log.Debug("Client command: ", request.Args.String())
 		// 验证命令
 		response = handler.ValidateCommand(clientInst, request.Args)
 		if response == nil {
