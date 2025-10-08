@@ -9,31 +9,58 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 type AofHandler struct {
 	aofFile  *os.File
 	aofMutex sync.Mutex
 
-	db DB
+	// fsync相关
+	fsyncStrategy string    // 同步策略: always, everysec, no
+	lastSyncTime  time.Time // 上次同步时间
+	db            DB
 }
 
 // NewAofHandler 创建一个新的AOF处理器
-func NewAofHandler(db DB, filename string) (*AofHandler, error) {
+func NewAofHandler(db DB, filename string, fsyncStrategy string) (*AofHandler, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
 
 	handler := &AofHandler{
-		aofFile: file,
-		db:      db,
+		aofFile:       file,
+		db:            db,
+		fsyncStrategy: fsyncStrategy,
+		lastSyncTime:  time.Now(),
 	}
 
 	// 加载现有AOF文件
 	handler.LoadAof()
 
+	// 如果策略是everysec，启动后台同步goroutine
+	if fsyncStrategy == "everysec" {
+		go handler.fsyncEverySecond()
+	}
+
 	return handler, nil
+}
+
+// fsyncEverySecond 每秒执行一次fsync
+func (handler *AofHandler) fsyncEverySecond() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		handler.aofMutex.Lock()
+		// 检查是否需要同步(至少1秒间隔)
+		if time.Since(handler.lastSyncTime) >= time.Second {
+			handler.aofFile.Sync()
+			handler.lastSyncTime = time.Now()
+		}
+		handler.aofMutex.Unlock()
+	}
 }
 
 // LoadAof 从AOF文件加载数据
@@ -123,14 +150,26 @@ func (handler *AofHandler) AddAof(args []resp.RespValue) {
 		return
 	}
 
-	// 强制同步到磁盘
-	handler.aofFile.Sync()
+	// 根据同步策略决定是否同步
+	switch handler.fsyncStrategy {
+	case "always":
+		// 立即同步到磁盘
+		handler.aofFile.Sync()
+		handler.lastSyncTime = time.Now()
+	case "everysec":
+		// everysec策略由后台goroutine处理
+	case "no":
+		// 不主动同步，由操作系统决定
+	}
 }
 
 // Close 关闭AOF处理器
 func (handler *AofHandler) Close() error {
 	handler.aofMutex.Lock()
 	defer handler.aofMutex.Unlock()
+
+	// 关闭前最后一次同步
+	handler.aofFile.Sync()
 
 	return handler.aofFile.Close()
 }

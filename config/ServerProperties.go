@@ -20,6 +20,7 @@ type ServerProperties struct {
 	// AOF相关配置
 	AppendOnly     bool
 	AppendFilename string
+	AppendFsync    string // AOF同步策略: always, everysec, no
 }
 
 var defaultProperties *ServerProperties
@@ -32,6 +33,7 @@ func init() {
 		Port:           6397,
 		AppendOnly:     false,
 		AppendFilename: "appendonly.aof",
+		AppendFsync:    "everysec", // 默认每秒同步一次
 	}
 }
 

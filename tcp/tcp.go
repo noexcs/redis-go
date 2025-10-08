@@ -47,7 +47,7 @@ func NewServer() *Server {
 	var aofHandler *database.AofHandler
 	if config.Properties.AppendOnly {
 		var err error
-		aofHandler, err = database.NewAofHandler(db, config.Properties.AppendFilename)
+		aofHandler, err = database.NewAofHandler(db, config.Properties.AppendFilename, config.Properties.AppendFsync)
 		if err != nil {
 			log.Error("Failed to initialize AOF handler: %v", err)
 		}
