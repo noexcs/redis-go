@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"strconv"
 	"strings"
@@ -22,15 +23,15 @@ func init() {
 // Syntax:
 //
 // SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-func execSet(db database.DB, args *resp2.Array) *parser.Response {
-	data := args.Data
-	key := (*data[1]).String()
-	value := (*data[2]).String()
+func execSet(db database.DB, args []resp.RespValue) *parser.Response {
+	data := args
+	key := data[1].String()
+	value := data[2].String()
 	db.SetValue(key, value)
 
 	options := make(map[string]interface{})
 	for i := 3; i < len(data); i++ {
-		Option := strings.ToUpper((*data[i]).String())
+		Option := strings.ToUpper(data[i].String())
 		switch Option {
 		case "NX", "XX":
 			{
@@ -67,7 +68,7 @@ func execSet(db database.DB, args *resp2.Array) *parser.Response {
 						Err: nil,
 					}
 				} else {
-					duration := *data[i+1]
+					duration := data[i+1]
 					atoi, err := strconv.ParseInt(duration.String(), 10, 64)
 					if err != nil {
 						return &parser.Response{
@@ -157,9 +158,9 @@ func execSet(db database.DB, args *resp2.Array) *parser.Response {
 // GET key
 // Return
 // Bulk string reply: the value of key, or nil when key does not exist.
-func execGet(db database.DB, args *resp2.Array) *parser.Response {
-	data := args.Data
-	key := (*data[1]).String()
+func execGet(db database.DB, args []resp.RespValue) *parser.Response {
+	data := args
+	key := data[1].String()
 	value, exist := db.GetValue(key)
 	if exist {
 		if v, ok := value.(string); ok {
@@ -187,11 +188,11 @@ func execGet(db database.DB, args *resp2.Array) *parser.Response {
 //
 // Return
 // Bulk string reply
-func execGetRange(db database.DB, args *resp2.Array) *parser.Response {
-	data := args.Data
-	key := (*data[1]).String()
-	start := (*data[2]).(*resp2.BulkString).Data
-	end := (*data[3]).(*resp2.BulkString).Data
+func execGetRange(db database.DB, args []resp.RespValue) *parser.Response {
+	data := args
+	key := data[1].String()
+	start := data[2].(*resp2.BulkString).Data
+	end := data[3].(*resp2.BulkString).Data
 
 	startInt, err1 := strconv.Atoi(string(start))
 	endInt, err2 := strconv.Atoi(string(end))
@@ -225,9 +226,9 @@ func execGetRange(db database.DB, args *resp2.Array) *parser.Response {
 //
 // Redis stores integers in their integer representation, so for string values that actually hold an integer,
 // there is no overhead for storing the string representation of the integer.
-func execIncr(db database.DB, args *resp2.Array) *parser.Response {
-	data := args.Data
-	key := (*data[1]).String()
+func execIncr(db database.DB, args []resp.RespValue) *parser.Response {
+	data := args
+	key := data[1].String()
 	value, exist := db.GetValue(key)
 	if !exist {
 		db.SetValue(key, "1")

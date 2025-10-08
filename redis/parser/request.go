@@ -1,16 +1,16 @@
 package parser
 
 import (
-	"github.com/noexcs/redis-go/redis/parser/resp2"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 )
 
 type Request struct {
-	Args resp2.RespType
-	Err  *Error
+	Args resp.RespValue
+	Err  *resp.Error
 }
 
 func MakeErrorRequest(kind string, message string) *Request {
-	return &Request{Err: &Error{
+	return &Request{Err: &resp.Error{
 		Kind:    kind,
 		Message: message,
 	}}
@@ -19,7 +19,7 @@ func MakeErrorRequest(kind string, message string) *Request {
 type Response Request
 
 func MakeErrorResponse(kind string, message string) *Response {
-	return &Response{Err: &Error{
+	return &Response{Err: &resp.Error{
 		Kind:    kind,
 		Message: message,
 	}}

@@ -10,6 +10,7 @@ import (
 	"github.com/noexcs/redis-go/redis/client"
 	"github.com/noexcs/redis-go/redis/handler"
 	"github.com/noexcs/redis-go/redis/parser"
+	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"net"
 	"sync"
@@ -18,8 +19,8 @@ import (
 
 type dbRequest struct {
 	Client *client.Client
-	Args   resp2.RespType
-	Result chan resp2.RespType
+	Args   resp.RespValue
+	Result chan resp.RespValue
 }
 
 type Server struct {
@@ -87,6 +88,7 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Handle(conn net.Conn) {
+
 	// 解析客户端请求
 	requestChan := parser.ParseIncomeStream(conn)
 
@@ -99,7 +101,8 @@ func (s *Server) Handle(conn net.Conn) {
 
 	// 处理请求
 	for request := range requestChan {
-		var response resp2.RespType
+		//parseResult(request)
+		var response resp.RespValue
 		if request.Err != nil {
 			break
 		}
@@ -108,7 +111,7 @@ func (s *Server) Handle(conn net.Conn) {
 		response = handler.ValidateCommand(clientInst, request.Args)
 		if response == nil {
 			// 将请求发送到数据库处理 goroutine
-			resultChan := make(chan resp2.RespType, 1)
+			resultChan := make(chan resp.RespValue, 1)
 			s.dbChan <- &dbRequest{
 				Client: clientInst,
 				Args:   request.Args,
