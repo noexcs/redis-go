@@ -16,6 +16,10 @@ type ServerProperties struct {
 	RequirePass string
 
 	Debug bool
+
+	// AOF相关配置
+	AppendOnly     bool
+	AppendFilename string
 }
 
 var defaultProperties *ServerProperties
@@ -23,7 +27,12 @@ var Properties *ServerProperties
 var configFile = "redis.conf"
 
 func init() {
-	defaultProperties = &ServerProperties{Bind: "0.0.0.0", Port: 6397}
+	defaultProperties = &ServerProperties{
+		Bind:           "0.0.0.0",
+		Port:           6397,
+		AppendOnly:     false,
+		AppendFilename: "appendonly.aof",
+	}
 }
 
 func Setup() {

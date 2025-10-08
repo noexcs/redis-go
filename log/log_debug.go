@@ -29,3 +29,7 @@ func Fatal(message ...any) {
 func Info(message ...any) {
 	Debug(message)
 }
+
+func Error(message ...any) {
+	Debug(message)
+}

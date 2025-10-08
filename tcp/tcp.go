@@ -3,6 +3,7 @@ package tcp
 import (
 	"context"
 	"fmt"
+	"github.com/noexcs/redis-go/command"
 	"github.com/noexcs/redis-go/config"
 	"github.com/noexcs/redis-go/database"
 	"github.com/noexcs/redis-go/database/simpleDB"
@@ -13,22 +14,25 @@ import (
 	"github.com/noexcs/redis-go/redis/parser/resp"
 	"github.com/noexcs/redis-go/redis/parser/resp2"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
 
 type dbRequest struct {
-	Client *client.Client
-	Args   resp.RespValue
-	Result chan resp.RespValue
+	Client  *client.Client
+	Args    resp.RespValue
+	Result  chan resp.RespValue
+	IsWrite bool // 标记是否为写命令
 }
 
 type Server struct {
-	db       database.DB
-	listener net.Listener
-	running  bool
-	mutex    sync.Mutex
-	wg       sync.WaitGroup
+	db         database.DB
+	aofHandler *database.AofHandler
+	listener   net.Listener
+	running    bool
+	mutex      sync.Mutex
+	wg         sync.WaitGroup
 
 	activeConn sync.Map
 	Proceeding sync.WaitGroup
@@ -38,9 +42,21 @@ type Server struct {
 }
 
 func NewServer() *Server {
+	db := simpleDB.NewGoMapDB()
+
+	var aofHandler *database.AofHandler
+	if config.Properties.AppendOnly {
+		var err error
+		aofHandler, err = database.NewAofHandler(db, config.Properties.AppendFilename)
+		if err != nil {
+			log.Error("Failed to initialize AOF handler: %v", err)
+		}
+	}
+
 	return &Server{
-		db:     simpleDB.NewGoMapDB(),
-		dbChan: make(chan *dbRequest, 1000), // 缓冲1000个请求
+		db:         db,
+		aofHandler: aofHandler,
+		dbChan:     make(chan *dbRequest, 1000), // 缓冲1000个请求
 	}
 }
 
@@ -110,12 +126,22 @@ func (s *Server) Handle(conn net.Conn) {
 		// 验证命令
 		response = handler.ValidateCommand(clientInst, request.Args)
 		if response == nil {
+			// 检查是否为写命令
+			isWrite := false
+			if array, ok := request.Args.(*resp2.Array); ok && len(array.Data) > 0 {
+				commandName := array.Data[0].String()
+				if cmd, exists := command.CmdTable[strings.ToUpper(commandName)]; exists {
+					isWrite = (cmd.Flags & command.FlagWrite) != 0
+				}
+			}
+
 			// 将请求发送到数据库处理 goroutine
 			resultChan := make(chan resp.RespValue, 1)
 			s.dbChan <- &dbRequest{
-				Client: clientInst,
-				Args:   request.Args,
-				Result: resultChan,
+				Client:  clientInst,
+				Args:    request.Args,
+				Result:  resultChan,
+				IsWrite: isWrite,
 			}
 
 			// 等待结果
@@ -139,6 +165,15 @@ func (s *Server) Handle(conn net.Conn) {
 func (s *Server) processDBRequests() {
 	for req := range s.dbChan {
 		response := handler.ExecCommand(req.Client, req.Args, s.db)
+
+		// 如果启用了AOF并且命令是写操作，则将命令添加到AOF
+		if s.aofHandler != nil && req.IsWrite {
+			// 检查命令是否为数组类型
+			if array, ok := req.Args.(*resp2.Array); ok {
+				s.aofHandler.AddAof(array.Data)
+			}
+		}
+
 		req.Result <- response
 		s.db.RandomExpiredKeys()
 	}
@@ -197,6 +232,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		log.Info("Server shutdown complete")
 		// 关闭数据库请求通道
 		close(s.dbChan)
+
+		// 关闭AOF处理器
+		if s.aofHandler != nil {
+			s.aofHandler.Close()
+		}
 	case <-ctx.Done():
 		log.Info("Server shutdown timeout")
 		return ctx.Err()

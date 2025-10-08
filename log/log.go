@@ -15,3 +15,7 @@ func Fatal(message ...any) {
 func Info(message ...any) {
 	log.Println(message)
 }
+
+func Error(message ...any) {
+	log.Println(message)
+}
